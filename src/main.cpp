@@ -2,17 +2,12 @@
 #include <PubSubClient.h>
 #include "credentials.h"
 #include "pinOutDefinitions.h"
+#include "globalVariables.h"
 #include "oneWireFunctions.h"
 #include "wifiFunctions.h"
+#include "mqttFunctions.h"
 
-//Set up network and MQTT
-
-const char* mqtt_server_add = MQTT_SERVER_ADD;
-const int   mqtt_server_port = MQTT_SERVER_PORT;
-WiFiClient espClient;
-PubSubClient mqtt_client(espClient);
-
-//set up variables
+//declare global variable starting values
 String temp_c_str = "";
 char temp_c_char[6];
 float setTemp = 10;
@@ -20,48 +15,6 @@ float currentTemp = 10;
 boolean immersionOn = false;
 boolean immersionBath = false;
 const long interval = 7000;
-
-void sendImersionTemp(){
-  Serial.print("Publish message: ");
-  Serial.println(currentTemp);
-  mqtt_client.publish("immersion-temp", temp_c_char);
-}
-
-void callback(char* topic, byte* payload, unsigned int length) {
-  // handle message arrived
-  Serial.print("Message arrived [");
-  Serial.print(topic);
-  Serial.print("] ");
-  Serial.println(currentTemp);
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
-  }
-  Serial.println();
-  if(strcmp(topic, "immersion-on")==0){
-    Serial.println("Setting Immersion On");
-    immersionOn = true;
-    payload[length] = '\0';
-    String s = String((char*)payload);
-    setTemp = s.toFloat();
-    //setTemp = 30;
-  }
-  if(strcmp(topic, "immersion-off")==0){
-    Serial.println("Setting Immersion Off");
-    immersionOn = false;
-    //setTemp = 30;
-  }
-  if(strcmp(topic, "immersion-bath")==0){
-    Serial.println("Setting Immersion Bath");
-    immersionBath = true;
-    //setTemp = 30;
-  }
-  if(strcmp(topic, "immersion-sink")==0){
-    Serial.println("Setting Immersion Sink");
-    immersionBath = false;
-    //setTemp = 30;
-  }
-  sendImersionTemp();
-}
 
 
 void setup(void)
@@ -79,10 +32,7 @@ void setup(void)
   // Connect to Wi-Fi network
   setup_wifi();
   // Connect to MQTT Broker
-
-  //mqtt_client.setServer(mqtt_server, 1883);
-  mqtt_client.setServer(mqtt_server_add, mqtt_server_port);
-  mqtt_client.setCallback(callback);
+  setup_mqtt();
 }
 
 void reconnect() {
