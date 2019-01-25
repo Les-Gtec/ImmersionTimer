@@ -49,6 +49,32 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   sendImersionTemp();
 }
 
+void mqttReconnect() {
+  // Loop until we're reconnected
+  while (!mqtt_client.connected()) {
+    Serial.print("Attempting MQTT connection...");
+    // Attempt to connect
+    if (mqtt_client.connect(MQTT_CLIENT_ID, MQTT_USERNAME, MQTT_PASSWD)) {
+      Serial.println("connected");
+      // Once connected, publish an announcement...
+      mqtt_client.publish("amAlive", "ImmersionTimer");
+      // ... and resubscribe
+      mqtt_client.subscribe("immersion-temp-check");
+      mqtt_client.subscribe("immersion-on");
+      mqtt_client.subscribe("immersion-off");
+      mqtt_client.subscribe("immersion-bath");
+      mqtt_client.subscribe("immersion-sink");
+
+    } else {
+      Serial.print("failed,");
+      Serial.println(" try again in 5 seconds");
+      // Wait 5 seconds before retrying
+      delay(5000);
+    }
+  }
+}
+
+
 void setup_mqtt() {
   mqtt_client.setServer(mqtt_server_add, mqtt_server_port);
   mqtt_client.setCallback(mqttCallback);

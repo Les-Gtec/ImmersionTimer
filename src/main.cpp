@@ -10,23 +10,25 @@
 //declare global variable starting values
 String temp_c_str = "";
 char temp_c_char[6];
-float setTemp = 10;
+float setTemp = 50;
 float currentTemp = 10;
 boolean immersionOn = false;
 boolean immersionBath = false;
 const long interval = 7000;
+const int buttonInterval = 400; // number of millisecs between button readings
+unsigned long currentMillis2 = 0;
+unsigned long previousImmersionButtonMillis = 0; // time when button press last checked
+unsigned long previousBathButtonMillis = millis(); // time when button press last checked
 
 
 void setup(void)
 {
-  pinMode(D4, OUTPUT);
-  digitalWrite(D4, HIGH);
-  pinMode(D5, OUTPUT);
-  digitalWrite(D5, LOW);
-  pinMode(D2, OUTPUT);
-  digitalWrite(D2, HIGH);
-  pinMode(D7, OUTPUT);
-  digitalWrite(D7, LOW);
+  pinMode(IMMERSION_ON_PIN, OUTPUT);
+  digitalWrite(IMMERSION_ON_PIN, HIGH); // the relay board has high as off
+  pinMode(IMMERSION_BATH_PIN, OUTPUT);
+  digitalWrite(IMMERSION_BATH_PIN, HIGH); // the relay board has high as off
+  pinMode(IMMERSION_ON_BTN, INPUT_PULLUP);
+  pinMode(IMMERSION_BATH_BTN, INPUT_PULLUP);
   Serial.begin(9600);
   delay(10);
   // Connect to Wi-Fi network
@@ -34,36 +36,45 @@ void setup(void)
   // Connect to MQTT Broker
   setup_mqtt();
 }
+void readImmersionButton() {
 
-void reconnect() {
-  // Loop until we're reconnected
-  while (!mqtt_client.connected()) {
-    Serial.print("Attempting MQTT connection...");
-    // Attempt to connect
-    if (mqtt_client.connect(MQTT_CLIENT_ID, MQTT_USERNAME, MQTT_PASSWD)) {
-      Serial.println("connected");
-      // Once connected, publish an announcement...
-      mqtt_client.publish("amAlive", "ImmersionTimer");
-      // ... and resubscribe
-      mqtt_client.subscribe("immersion-temp-check");
-      mqtt_client.subscribe("immersion-on");
-      mqtt_client.subscribe("immersion-off");
-      mqtt_client.subscribe("immersion-bath");
-      mqtt_client.subscribe("immersion-sink");
+  if (currentMillis2 - previousImmersionButtonMillis >= buttonInterval) {
 
-    } else {
-      Serial.print("failed,");
-      Serial.println(" try again in 5 seconds");
-      // Wait 5 seconds before retrying
-      delay(5000);
+    if ((digitalRead(IMMERSION_ON_BTN) == LOW)) { // && !immersionOn
+      Serial.println(" Immersion On BTN Pressed ");
+      //immersionOn = true;
+      previousImmersionButtonMillis = currentMillis2 + buttonInterval;
     }
   }
+
 }
+void readBathButton() {
+  unsigned long timeDifference = currentMillis2 - previousBathButtonMillis;
+  if (timeDifference >= buttonInterval) {
+    if (digitalRead(IMMERSION_BATH_BTN) == LOW) {
+      Serial.print(" Immersion Bath BTN Pressed current millis: " );
+      Serial.print(currentMillis2);
+      Serial.print(" button Interval: ");
+      Serial.print(buttonInterval);
+      Serial.print(" previous millis: ");
+      Serial.println(previousBathButtonMillis);
+      Serial.print("timeDifference: ");
+      Serial.println(timeDifference);
+      //immersionBath = !immersionBath;
+      previousBathButtonMillis = currentMillis2 + buttonInterval;
+    }
+  }
+
+}
+
 
 void loop(void)
 {
+  currentMillis2 = millis();
+  readImmersionButton();
+  readBathButton();
   static long currentMillis;
-  if (millis() - currentMillis >= interval)
+  if (currentMillis2 - currentMillis >= interval)
    {
      currentTemp = getOneWireTemp();
      if (currentTemp > 0){
@@ -77,10 +88,10 @@ void loop(void)
        Serial.println(" Celsius ");
      }
 
-     currentMillis = millis();
+     currentMillis = currentMillis2;
    }
   if (!mqtt_client.connected()) {
-    reconnect();
+    mqttReconnect();
   }
   mqtt_client.loop();
   if(immersionOn){
